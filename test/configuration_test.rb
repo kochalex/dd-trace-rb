@@ -51,5 +51,16 @@ module Datadog
         @configuration[:foobar]
       end
     end
+
+    def test_lazy_option
+      integration = Module.new do
+        include Contrib::Base
+        option :option1, default: -> { 1 + 1 }
+      end
+
+      @registry.add(:example, integration)
+
+      assert_equal(2, @configuration[:example][:option1])
+    end
   end
 end
