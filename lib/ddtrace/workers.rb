@@ -1,6 +1,7 @@
 require 'time'
 
 require 'ddtrace/buffer'
+require 'ddtrace/filter_pipeline'
 
 module Datadog
   module Workers
@@ -15,6 +16,7 @@ module Datadog
         @flush_interval = interval
         @trace_buffer = TraceBuffer.new(buff_size)
         @service_buffer = TraceBuffer.new(buff_size)
+        @filter_pipeline = FilterPipeline.new
         @transport = transport
 
         @worker = nil
@@ -26,7 +28,8 @@ module Datadog
         return if @trace_buffer.empty?
 
         begin
-          traces = @trace_buffer.pop()
+          traces = @trace_buffer.pop
+          traces = traces.map { |t| @filter_pipeline.call(t) }
           @trace_task.call(traces, @transport)
         rescue StandardError => e
           # ensures that the thread will not die because of an exception.
@@ -86,6 +89,10 @@ module Datadog
       def enqueue_service(service)
         return if service == {} # no use to send this, not worth it
         @service_buffer.push(service)
+      end
+
+      def add_filter(*args, &block)
+        @filter_pipeline.add_filter(*args, &block)
       end
     end
   end

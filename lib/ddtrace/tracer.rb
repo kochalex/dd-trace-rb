@@ -306,6 +306,10 @@ module Datadog
       @services = {}
     end
 
+    def add_filter(*args, &block)
+      writer.worker.add_filter(*args, &block)
+    end
+
     private :write, :guess_context_and_parent
   end
 end
