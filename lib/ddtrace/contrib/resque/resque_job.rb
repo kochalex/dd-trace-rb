@@ -6,8 +6,11 @@ module Datadog
     module ResqueJob
       SERVICE = 'resque'.freeze
 
-      def self.extended(base)
-        Datadog::Pin.new(SERVICE, app_type: Ext::AppTypes::WORKER).onto(base)
+      class << self
+        def extended(base)
+          Datadog::Pin.new(SERVICE, app_type: Ext::AppTypes::WORKER).onto(base)
+        end
+        alias_method :included, :extended
       end
 
       def around_perform(*args)
