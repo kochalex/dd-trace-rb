@@ -1,29 +1,31 @@
 require 'ddtrace/ext/app_types'
+require 'resque'
 
 module Datadog
   module Contrib
-    # Uses Resque job hooks to create traces
-    module ResqueJob
-      SERVICE = 'resque'.freeze
-
-      def self.extended(base)
-        Datadog::Pin.new(SERVICE, app_type: Ext::AppTypes::WORKER).onto(base)
-      end
-
-      def around_perform(*args)
-        pin = datadog_pin
-        pin.tracer.set_service_info(SERVICE, 'resque', Ext::AppTypes::WORKER)
-        pin.tracer.trace('resque.job', service: SERVICE) do |span|
-          span.resource = name
-          span.span_type = pin.app_type
-          yield
+    module Resque
+      # Uses Resque job hooks to create traces
+      module ResqueJob
+        def around_perform(*args)
+          pin = Pin.get_from(::Resque)
+          pin.tracer.trace('resque.job', service: pin.service) do |span|
+            span.resource = name
+            span.span_type = pin.app_type
+            yield
+            span.service = pin.service
+          end
         end
-      end
 
-      def after_perform(*args)
-        pin = datadog_pin
-        pin.tracer.shutdown!
+        def after_perform(*args)
+          pin = Pin.get_from(::Resque)
+          pin.tracer.shutdown!
+        end
       end
     end
   end
+end
+
+Resque.before_first_fork do
+  pin = Datadog::Pin.get_from(Resque)
+  pin.tracer.set_service_info(pin.service, 'resque', Datadog::Ext::AppTypes::WORKER)
 end
