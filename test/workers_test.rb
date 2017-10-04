@@ -153,6 +153,19 @@ class WorkersSpanTest < WorkersTest
     # which should be guessed from the script being executed.
     assert_equal('rake_test_loader', span['service'], 'wrong service')
   end
+
+  def test_span_filtering
+    @worker.add_filter { |span| span.name == 'discard.this' }
+    @tracer.start_span('keep.this', service: 'tracer-test').finish
+    @tracer.start_span('discard.this', service: 'tracer-test').finish
+
+    try_wait_until do
+      @transport.helper_sent[200][:traces].any? rescue false
+    end
+
+    assert_match(/keep\.this/, @transport.helper_sent[200][:traces].to_s)
+    refute_match(/discard\.this/, @transport.helper_sent[200][:traces].to_s)
+  end
 end
 
 class WorkersServiceTest < WorkersTest
